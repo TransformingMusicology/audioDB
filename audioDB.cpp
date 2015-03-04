@@ -3,9 +3,6 @@
 
 #include <gsl/gsl_sf.h>
 
-char* SERVER_ADB_ROOT;
-char* SERVER_ADB_FEATURE_ROOT;
-
 audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZERS
 {
   if(processArgs(argc, argv)<0){
@@ -24,10 +21,7 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
   if(dbName && adb_root)
     prefix_name((char** const)&dbName, adb_root);
 
-  if(O2_ACTION(COM_SERVER)){
-    startServer();
-  }
-  else  if(O2_ACTION(COM_CREATE))
+  if(O2_ACTION(COM_CREATE))
     create(dbName);
 
   else if(O2_ACTION(COM_INSERT))
@@ -37,23 +31,9 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
     batchinsert(dbName, inFile);
 
   else if(O2_ACTION(COM_QUERY))
-    if(isClient){
-      if(query_from_key){
-	VERB_LOG(1, "Calling web services query %s on database %s, query=%s\n", radius>0?"(Radius)":"(NN)", dbName, (key&&strlen(key))?key:inFile);
-	ws_query_by_key(dbName, key, inFile, (char*)hostport);	
-      }
-      else{
-	VERB_LOG(1, "Calling web services query on database %s, query=%s\n", dbName, (key&&strlen(key))?key:inFile);
-	ws_query(dbName, inFile, (char*)hostport);
-      }
-    }
-    else
-      query(dbName, inFile);
+    query(dbName, inFile);
 
   else if(O2_ACTION(COM_STATUS))
-    if(isClient)
-      ws_status(dbName,(char*)hostport);
-    else
       status(dbName);
 
   else if(O2_ACTION(COM_SAMPLE))
@@ -69,64 +49,13 @@ audioDB::audioDB(const unsigned argc, const char *argv[]): O2_AUDIODB_INITIALIZE
     dump(dbName);
 
   else if(O2_ACTION(COM_LISZT))
-    if(isClient)
-      ws_liszt(dbName, (char*) hostport);
-    else
-      liszt(dbName, lisztOffset, lisztLength);
+    liszt(dbName, lisztOffset, lisztLength);
 
   else if(O2_ACTION(COM_INDEX))
     index_index_db(dbName);
   
   else
     error("Unrecognized command",command);
-}
-
-audioDB::audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__queryResponse *adbQueryResponse): O2_AUDIODB_INITIALIZERS
-{
-  try {
-    isServer = 1; // Set to make errors report over SOAP
-    processArgs(argc, argv);
-    // Perform database prefix substitution
-    if(dbName && adb_root)
-      prefix_name((char** const)&dbName, adb_root);
-    assert(O2_ACTION(COM_QUERY));
-    query(dbName, inFile, soap, adbQueryResponse);
-  } catch(char *err) {
-    cleanup();
-    throw(err);
-  }
-}
-
-audioDB::audioDB(const unsigned argc, const char *argv[], adb__statusResponse *adbStatusResponse): O2_AUDIODB_INITIALIZERS
-{
-  try {
-    isServer = 1; // Set to make errors report over SOAP
-    processArgs(argc, argv);
-    // Perform database prefix substitution
-    if(dbName && adb_root)
-      prefix_name((char** const)&dbName, adb_root);
-    assert(O2_ACTION(COM_STATUS));
-    status(dbName, adbStatusResponse);
-  } catch(char *err) {
-    cleanup();
-    throw(err);
-  }
-}
-
-audioDB::audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__lisztResponse *adbLisztResponse): O2_AUDIODB_INITIALIZERS
-{
-  try {
-    isServer = 1; // Set to make errors report over SOAP
-    processArgs(argc, argv); 
-    // Perform database prefix substitution
-    if(dbName && adb_root)
-      prefix_name((char** const)&dbName, adb_root);
-    assert(O2_ACTION(COM_LISZT));
-    liszt(dbName, lisztOffset, lisztLength, soap, adbLisztResponse);
-  } catch(char *err) {
-    cleanup();
-    throw(err);
-  }
 }
 
 void audioDB::cleanup() {
@@ -278,47 +207,6 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
 
   if (args_info.adb_feature_root_given){
     adb_feature_root = args_info.adb_feature_root_arg;
-  }
-
-  // perform dbName path prefix SERVER-side subsitution
-  if(SERVER_ADB_ROOT && !adb_root)
-    adb_root = SERVER_ADB_ROOT;
-  if(SERVER_ADB_FEATURE_ROOT && !adb_feature_root)
-    adb_feature_root = SERVER_ADB_FEATURE_ROOT;
-
-  if(args_info.SERVER_given){
-    command=COM_SERVER;
-    port=args_info.SERVER_arg;
-    if(port<100 || port > 100000)
-      error("port out of range");
-#if defined(O2_DEBUG)
-    struct sigaction sa;
-    sa.sa_sigaction = sigterm_action;
-    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
-    sigaction(SIGTERM, &sa, NULL);
-    sa.sa_sigaction = sighup_action;
-    sa.sa_flags = SA_SIGINFO | SA_RESTART | SA_NODEFER;
-    sigaction(SIGHUP, &sa, NULL);
-#endif
-    if(args_info.load_index_given){
-      if(!args_info.database_given)
-	error("load_index requires a --database argument");
-      else
-	dbName=args_info.database_arg;
-      if(!args_info.radius_given)
-	error("load_index requires a --radius argument");
-      if(!args_info.sequencelength_given)
-	error("load_index requires a --sequenceLength argument");
-      WS_load_index = true;
-    }
-    return 0;
-  }
-
-  // No return on client command, find database command
-  if(args_info.client_given){
-    command=COM_CLIENT;
-    hostport=args_info.client_arg;
-    isClient=1;
   }
 
   if(args_info.NEW_given){
@@ -596,8 +484,9 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
   return -1; // no command found
 }
 
-void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse){
+void audioDB::status(const char* dbName){
   adb_status_t status;
+
   if(!adb) {
     if(!(adb = audiodb_open(dbName, O_RDONLY))) {
       error("Failed to open database file", dbName);
@@ -607,44 +496,35 @@ void audioDB::status(const char* dbName, adb__statusResponse *adbStatusResponse)
     error("Failed to retrieve database status", dbName);
   }
   
-  if(adbStatusResponse == 0) {
-    std::cout << "num files:" << status.numFiles << std::endl;
-    std::cout << "data dim:" << status.dim <<std::endl;
-    if(status.dim > 0) {
-      size_t bytes_per_vector = sizeof(double) * status.dim;
-      off_t nvectors = status.length / bytes_per_vector;
-      off_t data_region_vectors = status.data_region_size / bytes_per_vector;
-      std::cout << "total vectors:" << nvectors << std::endl;
-      std::cout << "vectors available:";
-      if(status.flags & O2_FLAG_LARGE_ADB) {
-	std::cout << O2_MAX_VECTORS - nvectors << std::endl;
-      } else {
-	std::cout << data_region_vectors - nvectors << std::endl;
-      }
+  std::cout << "num files:" << status.numFiles << std::endl;
+  std::cout << "data dim:" << status.dim <<std::endl;
+  if(status.dim > 0) {
+    size_t bytes_per_vector = sizeof(double) * status.dim;
+    off_t nvectors = status.length / bytes_per_vector;
+    off_t data_region_vectors = status.data_region_size / bytes_per_vector;
+    std::cout << "total vectors:" << nvectors << std::endl;
+    std::cout << "vectors available:";
+    if(status.flags & O2_FLAG_LARGE_ADB) {
+      std::cout << O2_MAX_VECTORS - nvectors << std::endl;
+    } else {
+      std::cout << data_region_vectors - nvectors << std::endl;
     }
-    if(!(status.flags & O2_FLAG_LARGE_ADB)) {
-      double used_frac = ((double) status.length) / status.data_region_size;
-      std::cout << "total bytes:" << status.length << 
-	" (" << (100.0*used_frac) << "%)" << std::endl;
-      std::cout << "bytes available:" << status.data_region_size - status.length << 
-	" (" << (100.0*(1-used_frac)) << "%)" << std::endl;
-    }
-    std::cout << "flags:" << " l2norm[" << DISPLAY_FLAG(status.flags&O2_FLAG_L2NORM)
-	      << "] minmax[" << DISPLAY_FLAG(status.flags&O2_FLAG_MINMAX)
-	      << "] power[" << DISPLAY_FLAG(status.flags&O2_FLAG_POWER)
-	      << "] times[" << DISPLAY_FLAG(status.flags&O2_FLAG_TIMES) 
-	      << "] largeADB[" << DISPLAY_FLAG(status.flags&O2_FLAG_LARGE_ADB)
-	      << "]" << endl;    
-              
-    std::cout << "null count: " << status.nullCount << " small sequence count " << status.dudCount-status.nullCount << std::endl;    
-  } else {
-    adbStatusResponse->result.numFiles = status.numFiles;
-    adbStatusResponse->result.dim = status.dim;
-    adbStatusResponse->result.length = status.length;
-    adbStatusResponse->result.dudCount = status.dudCount;
-    adbStatusResponse->result.nullCount = status.nullCount;
-    adbStatusResponse->result.flags = status.flags;
   }
+  if(!(status.flags & O2_FLAG_LARGE_ADB)) {
+    double used_frac = ((double) status.length) / status.data_region_size;
+    std::cout << "total bytes:" << status.length <<
+      " (" << (100.0*used_frac) << "%)" << std::endl;
+    std::cout << "bytes available:" << status.data_region_size - status.length <<
+      " (" << (100.0*(1-used_frac)) << "%)" << std::endl;
+  }
+  std::cout << "flags:" << " l2norm[" << DISPLAY_FLAG(status.flags&O2_FLAG_L2NORM)
+            << "] minmax[" << DISPLAY_FLAG(status.flags&O2_FLAG_MINMAX)
+            << "] power[" << DISPLAY_FLAG(status.flags&O2_FLAG_POWER)
+            << "] times[" << DISPLAY_FLAG(status.flags&O2_FLAG_TIMES)
+            << "] largeADB[" << DISPLAY_FLAG(status.flags&O2_FLAG_LARGE_ADB)
+            << "]" << endl;
+
+  std::cout << "null count: " << status.nullCount << " small sequence count " << status.dudCount-status.nullCount << std::endl;
 }
 
 void audioDB::l2norm(const char* dbName) {
@@ -852,7 +732,7 @@ void audioDB::rotateDatum(adb_datum_t *datum, int amount) {
   free(buf);
 }
 
-void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, adb__queryResponse *adbQueryResponse) {
+void audioDB::query(const char* dbName, const char* inFile) {
 
   if(!adb) {
     if(!(adb = audiodb_open(dbName, O_RDONLY))) {
@@ -1069,10 +949,10 @@ void audioDB::query(const char* dbName, const char* inFile, struct soap *soap, a
     datum.times = NULL;
   }
 
-  reporter->report(adb, soap, adbQueryResponse, use_rotate);
+  reporter->report(adb, use_rotate);
 }
 
-void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, struct soap *soap, adb__lisztResponse* adbLisztResponse) {
+void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines) {
   if(!adb) {
     if(!(adb = audiodb_open(dbName, O_RDONLY))) {
       error("failed to open database", dbName);
@@ -1089,23 +969,9 @@ void audioDB::liszt(const char* dbName, unsigned offset, unsigned numLines, stru
     error("listKeys offset out of range");
   }
 
-  if(!adbLisztResponse){
-    for(uint32_t k = 0; k < numLines && offset + k < results->nresults; k++) {
-      uint32_t index = offset + k;
-      printf("[%d] %s (%d)\n", index, results->entries[index].key, results->entries[index].nvectors);
-    }
-  } else {
-    adbLisztResponse->result.Rkey = (char **) soap_malloc(soap, numLines * sizeof(char *));
-    adbLisztResponse->result.Rlen = (unsigned int *) soap_malloc(soap, numLines * sizeof(unsigned int));
-    uint32_t k;
-    for(k = 0; k < numLines && offset + k < results->nresults; k++) {
-      uint32_t index = offset + k;
-      adbLisztResponse->result.Rkey[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-      snprintf(adbLisztResponse->result.Rkey[k], O2_MAXFILESTR, "%s", results->entries[index].key);
-      adbLisztResponse->result.Rlen[k] = results->entries[index].nvectors;
-    }
-    adbLisztResponse->result.__sizeRkey = k;
-    adbLisztResponse->result.__sizeRlen = k;
+  for(uint32_t k = 0; k < numLines && offset + k < results->nresults; k++) {
+    uint32_t index = offset + k;
+    printf("[%d] %s (%d)\n", index, results->entries[index].key, results->entries[index].nvectors);
   }
   audiodb_liszt_free_results(adb, results);  
 }
@@ -1271,7 +1137,5 @@ void audioDB::sample(const char *dbName) {
 // This entry point is visited once per instance
 // so it is a good place to set any global state variables
 int main(const int argc, const char* argv[]){
-  SERVER_ADB_ROOT = 0;            // Server-side database root prefix
-  SERVER_ADB_FEATURE_ROOT = 0;    // Server-side features root prefix
   audioDB(argc, argv);
 }

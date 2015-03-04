@@ -46,18 +46,4 @@ echo "[0] testkey01 (2)" > test-expected-output
 echo "[1] testkey02 (2)" >> test-expected-output
 cmp testoutput test-expected-output
 
-WSPORT=10039
-start_server ${AUDIODB} ${WSPORT}
-
-expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset -1
-expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztOffset 3
-expect_client_failure ${AUDIODB} -d testdb -c localhost:${WSPORT} --LISZT --lisztLength -1
-
-check_server $!
-
-${AUDIODB} -c localhost:${WSPORT} -d testdb --LISZT > testoutput
-cmp testoutput test-expected-output
-
-stop_server $!
-
 exit 104

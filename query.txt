@@ -85,8 +85,8 @@ roughly
 This separation is engineered (ha) such that everything after the last
 use of the accumulator doesn't need to be in libaudiodb; the return
 value from audiodb_query() can be "results" in the above, and then the
-command-line binary and SOAP server can do whatever weird mangling to
-the results they want to.
+command-line binary can do whatever weird mangling to the results it
+wants to.
 
 We still need to be careful in the accumulator to defend against some
 of the weird things that our query implementation might choose to do:

@@ -32,7 +32,6 @@ extern "C" {
 #include "lshlib.h"
 
 // includes for web services
-#include "soapH.h"
 #include "cmdline.h"
 
 #define MAXSTR ADB_MAXSTR
@@ -46,13 +45,11 @@ extern "C" {
 #define COM_L2NORM "--L2NORM"
 #define COM_POWER "--POWER"
 #define COM_DUMP "--DUMP"
-#define COM_SERVER "--SERVER"
 #define COM_INDEX "--INDEX"
 #define COM_SAMPLE "--SAMPLE"
 #define COM_LISZT "--LISZT"
 
 // parameters
-#define COM_CLIENT "--client"
 #define COM_DATABASE "--database"
 #define COM_QTYPE "--qtype"
 #define COM_SEQLEN "--sequencelength"
@@ -173,9 +170,6 @@ extern "C" {
 #define SAFE_DELETE(PTR) delete PTR; PTR=0;
 #define SAFE_DELETE_ARRAY(PTR) delete[] PTR; PTR=0;
 
-extern char* SERVER_ADB_ROOT;
-extern char* SERVER_ADB_FEATURE_ROOT;
-
 class audioDB{  
  private:
   gengetopt_args_info args_info;
@@ -242,8 +236,6 @@ class audioDB{
   unsigned usingQueryPoint;
   unsigned usingTimes;
   unsigned usingPower;
-  unsigned isClient;
-  unsigned isServer;
   unsigned port;
   double timesTol;
   double radius;
@@ -261,6 +253,9 @@ class audioDB{
   unsigned lisztOffset;
   unsigned lisztLength;
 
+  // a handle for the dynamically loaded libaudioDB library
+  void* ladb;
+
   // private methods
   void error(const char* a, const char* b = "", const char *sysFunc = 0) __attribute__ ((noreturn));
 
@@ -273,9 +268,6 @@ class audioDB{
 
  public:
   audioDB(const unsigned argc, const char *argv[]);
-  audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__queryResponse *adbQueryResponse);
-  audioDB(const unsigned argc, const char *argv[], adb__statusResponse *adbStatusResponse);
-  audioDB(const unsigned argc, const char *argv[], struct soap *soap, adb__lisztResponse *adbLisztResponse);
 
   void cleanup();
   ~audioDB();
@@ -285,22 +277,21 @@ class audioDB{
   void batchinsert(const char* dbName, const char* inFile);
   void datumFromFiles(adb_datum_t *datum);
   void rotateDatum(adb_datum_t *datum, int amount);
-  void query(const char* dbName, const char* inFile, struct soap *soap=0, adb__queryResponse *adbQueryResponse=0);
-  void status(const char* dbName, adb__statusResponse *adbStatusResponse=0);
+  void query(const char* dbName, const char* inFile);
+  void status(const char* dbName);
 
   unsigned random_track(unsigned *propTable, unsigned total);
   void sample(const char *dbName);
   void l2norm(const char* dbName);
   void power_flag(const char *dbName);
   void dump(const char* dbName);
-  void liszt(const char* dbName, unsigned offset, unsigned numLines, struct soap *soap=0, adb__lisztResponse* adbLisztResponse=0);
+  void liszt(const char* dbName, unsigned offset, unsigned numLines);
 
   // LSH indexing parameters and data structures
   LSH* lsh;
   bool lsh_in_core;     // load LSH tables for query into core (true) or keep on disk (false)
   bool lsh_use_u_functions;
   bool lsh_exact;      // flag to indicate use exact evaluation of points returned by LSH
-  bool WS_load_index; // flag to indicate that we want to make a Web Services index memory resident
   double lsh_param_w; // Width of LSH hash-function bins
   Uns32T lsh_param_k; // Number of independent hash functions
   Uns32T lsh_param_m; // Combinatorial parameter for m(m-1)/2 hash tables
@@ -317,14 +308,6 @@ class audioDB{
   void insertPowerData(unsigned n, int powerfd, double *powerdata);
   void init_track_aux_data(Uns32T trackID, double* fvp, double** sNormpp,double** snPtrp, double** sPowerp, double** spPtrp);
   
-  // Web Services
-  void startServer();
-
-  void ws_status(const char*dbName, char* hostport);
-  void ws_query(const char*dbName, const char *featureFileName, const char* hostport);
-  void ws_query_by_key(const char*dbName, const char *trackKey, const char* featureFileName, const char* hostport);
-  void ws_liszt(const char* dbName, char* hostport);
-
 };
 
 #define O2_AUDIODB_INITIALIZERS			\
@@ -379,8 +362,6 @@ class audioDB{
     usingQueryPoint(0),				\
     usingTimes(0),				\
     usingPower(0),				\
-    isClient(0),				\
-    isServer(0),				\
     port(0),					\
     timesTol(0.1),				\
     radius(0),					\
@@ -398,7 +379,6 @@ class audioDB{
     lsh_in_core(false),				\
     lsh_use_u_functions(false),                 \
     lsh_exact(false),                           \
-    WS_load_index(false),                       \
     lsh_param_k(0),				\
     lsh_param_m(0),				\
     lsh_param_N(0),				\

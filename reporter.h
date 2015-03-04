@@ -42,12 +42,7 @@ class Reporter : public ReporterBase {
 public:
   virtual ~Reporter() {};
   virtual void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0) = 0;
-  // FIXME: this interface is a bit wacky: a relic of previous, more
-  // confused times.  Really it might make sense to have separate
-  // reporter classes for WS and for stdout, rather than passing this
-  // adbQueryResponse thing everywhere; the adb argument is there
-  // solely for converting trackIDs into names.  -- CSR, 2007-12-10.
-  virtual void report(adb_t *adb, struct soap *soap, void* adbQueryResponse, bool report_rot = false) = 0;
+  virtual void report(adb_t *adb, bool report_rot = false) = 0;
 };
 
 template <class T> class pointQueryReporter : public Reporter {
@@ -55,7 +50,7 @@ public:
   pointQueryReporter(unsigned int pointNN);
   ~pointQueryReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
-  void report(adb_t *adb, struct soap *soap, void* adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
 private:
   unsigned int pointNN;
   std::priority_queue< NNresult, std::vector< NNresult >, T> *queue;
@@ -85,7 +80,7 @@ template <class T> void pointQueryReporter<T>::add_point(unsigned int trackID, u
   }
 }
 
-template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
+template <class T> void pointQueryReporter<T>::report(adb_t *adb, bool report_rot) {
   NNresult r;
   std::vector<NNresult> v;
   unsigned int size = queue->size();
@@ -96,40 +91,16 @@ template <class T> void pointQueryReporter<T>::report(adb_t *adb, struct soap *s
   }
   std::vector<NNresult>::reverse_iterator rit;
       
-  if(adbQueryResponse==0) {
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      if(adb)
-	std::cout << audiodb_index_key(adb, r.trackID) << " ";
-      else
-	std::cout << r.trackID << " ";
-      std::cout << r.dist << " " << r.qpos << " " << r.spos;
-      if(report_rot)
-        std::cout << " " << r.rot;
-      std::cout << std::endl;
-    }
-  } else {
-    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
-    response->result.__sizeRlist=size;
-    response->result.__sizeDist=size;
-    response->result.__sizeQpos=size;
-    response->result.__sizeSpos=size;
-    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
-    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
-    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    unsigned int k = 0;
-    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
-      r = *rit;
-      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-      response->result.Dist[k] = r.dist;
-      response->result.Qpos[k] = r.qpos;
-      response->result.Spos[k] = r.spos;
-      if(adb)
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
-      else
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
-    }
+  for(rit = v.rbegin(); rit < v.rend(); rit++) {
+    r = *rit;
+    if(adb)
+      std::cout << audiodb_index_key(adb, r.trackID) << " ";
+    else
+      std::cout << r.trackID << " ";
+    std::cout << r.dist << " " << r.qpos << " " << r.spos;
+    if(report_rot)
+      std::cout << " " << r.rot;
+    std::cout << std::endl;
   }
 }
 
@@ -138,7 +109,7 @@ template <class T> class trackAveragingReporter : public Reporter {
   trackAveragingReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackAveragingReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -170,7 +141,7 @@ template <class T> void trackAveragingReporter<T>::add_point(unsigned int trackI
   }
 }
 
-template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
+template <class T> void trackAveragingReporter<T>::report(adb_t *adb, bool report_rot) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   for (int i = numFiles-1; i >= 0; i--) {
     unsigned int size = queues[i].size();
@@ -208,40 +179,16 @@ template <class T> void trackAveragingReporter<T>::report(adb_t *adb, struct soa
   }
   std::vector<NNresult>::reverse_iterator rit;
       
-  if(adbQueryResponse==0) {
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      if(adb)
-	std::cout << audiodb_index_key(adb, r.trackID) << " ";
-      else
-	std::cout << r.trackID << " ";
-      std::cout << r.dist << " " << r.qpos << " " << r.spos;
-      if(report_rot)
-        std::cout << " " << r.rot;
-      std::cout << std::endl;
-    }
-  } else {
-    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
-    response->result.__sizeRlist=size;
-    response->result.__sizeDist=size;
-    response->result.__sizeQpos=size;
-    response->result.__sizeSpos=size;
-    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
-    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
-    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    unsigned int k = 0;
-    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
-      r = *rit;
-      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-      response->result.Dist[k] = r.dist;
-      response->result.Qpos[k] = r.qpos;
-      response->result.Spos[k] = r.spos;
-      if(adb)
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
-      else
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
-    }
+  for(rit = v.rbegin(); rit < v.rend(); rit++) {
+    r = *rit;
+    if(adb)
+      std::cout << audiodb_index_key(adb, r.trackID) << " ";
+    else
+      std::cout << r.trackID << " ";
+    std::cout << r.dist << " " << r.qpos << " " << r.spos;
+    if(report_rot)
+      std::cout << " " << r.rot;
+    std::cout << std::endl;
   }
 }
 
@@ -254,13 +201,13 @@ template <class T> class trackSequenceQueryNNReporter : public trackAveragingRep
   using trackAveragingReporter<T>::pointNN;
  public:
   trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
 };
 
 template <class T> trackSequenceQueryNNReporter<T>::trackSequenceQueryNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles)
 :trackAveragingReporter<T>(pointNN, trackNN, numFiles){}
 
-template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
+template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, bool report_rot) {
   std::priority_queue < NNresult, std::vector< NNresult>, T> result;
   std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> > *point_queues 
     = new std::priority_queue< NNresult, std::vector< NNresult>, std::less<NNresult> >[numFiles];
@@ -305,77 +252,27 @@ template <class T> void trackSequenceQueryNNReporter<T>::report(adb_t *adb, stru
   std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > point_queue;      
   NNresult rk;
 
-  if(adbQueryResponse==0) {
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      if(adb)
-	std::cout << audiodb_index_key(adb, r.trackID) << " ";
-      else
-	std::cout << r.trackID << " ";
-      std::cout << r.dist << std::endl;
-      unsigned int qsize = point_queues[r.trackID].size();
-      // Reverse the order of the points stored in point_queues
-      for(unsigned int k=0; k < qsize; k++){
-	point_queue.push( point_queues[r.trackID].top() );
-	point_queues[r.trackID].pop();
-      }
-      
-      for(unsigned int k = 0; k < qsize; k++) {
-	rk = point_queue.top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
-        if(report_rot)
-          std::cout << " " << rk.rot;
-        std::cout << std::endl;
-	point_queue.pop();
-      }
+  for(rit = v.rbegin(); rit < v.rend(); rit++) {
+    r = *rit;
+    if(adb)
+      std::cout << audiodb_index_key(adb, r.trackID) << " ";
+    else
+      std::cout << r.trackID << " ";
+    std::cout << r.dist << std::endl;
+    unsigned int qsize = point_queues[r.trackID].size();
+    // Reverse the order of the points stored in point_queues
+    for(unsigned int k=0; k < qsize; k++){
+      point_queue.push( point_queues[r.trackID].top() );
+      point_queues[r.trackID].pop();
     }
-  } else {
-    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
-    response->result.__sizeRlist=size*pointNN;
-    response->result.__sizeDist=size*pointNN;
-    response->result.__sizeQpos=size*pointNN;
-    response->result.__sizeSpos=size*pointNN;
-    response->result.Rlist= (char **) soap_malloc(soap, size * pointNN * sizeof(char *));
-    response->result.Dist = (double *) soap_malloc(soap, size * pointNN * sizeof(double));
-    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
-    response->result.Spos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
-    unsigned int k = 0;
-    // Loop over returned tracks
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      // Reverse the order of the points stored in point_queues
-      unsigned int qsize=point_queues[r.trackID].size();
-      while(qsize--){
-	point_queue.push(point_queues[r.trackID].top());
-	point_queues[r.trackID].pop();
-      }
-      qsize=point_queue.size();
-      unsigned int numReports = pointNN;
-      while(numReports--){ // pop the rest of the points
-	if(qsize)
-	  rk = point_queue.top(); // Take one point from the top of the queue
-	else{
-	  rk.dist = 1000000000.0;
-	  rk.qpos = 0xFFFFFFFF;
-	  rk.spos = 0xFFFFFFFF;
-	}
-	  
-	response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-	response->result.Dist[k] = rk.dist;
-	response->result.Qpos[k] = rk.qpos;
-	response->result.Spos[k] = rk.spos;
-	if(qsize){
-	  if(adb)
-	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
-	  else
-	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
-	  point_queue.pop();
-	  qsize--;
-	}
-	else
-	  snprintf(response->result.Rlist[k], O2_MAXFILESTR, "NULL");		  
-	k++;
-      }
+
+    for(unsigned int k = 0; k < qsize; k++) {
+      rk = point_queue.top();
+      std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
+      if(report_rot)
+        std::cout << " " << rk.rot;
+      std::cout << std::endl;
+      point_queue.pop();
     }
   }
   // clean up
@@ -428,7 +325,7 @@ public:
   trackSequenceQueryRadReporter(unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
  protected:
   unsigned int trackNN;
   unsigned int numFiles;
@@ -475,7 +372,7 @@ void trackSequenceQueryRadReporter::add_point(unsigned int trackID, unsigned int
   }
 }
 
-void trackSequenceQueryRadReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
+void trackSequenceQueryRadReporter::report(adb_t *adb, bool report_rot) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -501,37 +398,13 @@ void trackSequenceQueryRadReporter::report(adb_t *adb, struct soap *soap, void *
   }
   std::vector<Radresult>::reverse_iterator rit;
       
-  if(adbQueryResponse==0) {
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      if(adb)
-	std::cout << audiodb_index_key(adb, r.trackID) << " ";
-      else
-	std::cout << r.trackID << " ";
-      std::cout << r.count << std::endl;
-    }
-  } else {
-    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
-    response->result.__sizeRlist=size;
-    response->result.__sizeDist=size;
-    response->result.__sizeQpos=size;
-    response->result.__sizeSpos=size;
-    response->result.Rlist= (char **) soap_malloc(soap, size * sizeof(char *));
-    response->result.Dist = (double *) soap_malloc(soap, size * sizeof(double));
-    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    response->result.Spos = (unsigned int *) soap_malloc(soap, size * sizeof(unsigned int));
-    unsigned int k = 0;
-    for(rit = v.rbegin(); rit < v.rend(); rit++, k++) {
-      r = *rit;
-      response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-      response->result.Dist[k] = 0;
-      response->result.Qpos[k] = 0;
-      response->result.Spos[k] = r.count;
-      if(adb)
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
-      else
-	snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);
-    }
+  for(rit = v.rbegin(); rit < v.rend(); rit++) {
+    r = *rit;
+    if(adb)
+      std::cout << audiodb_index_key(adb, r.trackID) << " ";
+    else
+      std::cout << r.trackID << " ";
+    std::cout << r.count << std::endl;
   }
 }
 
@@ -544,7 +417,7 @@ public:
   trackSequenceQueryRadNNReporter(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporter();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -607,7 +480,7 @@ void trackSequenceQueryRadNNReporter::add_point(unsigned int trackID, unsigned i
   }
 }
 
-void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
+void trackSequenceQueryRadNNReporter::report(adb_t *adb, bool report_rot) {
   std::priority_queue < Radresult, std::vector<Radresult>, std::greater<Radresult> > result;
   // KLUDGE: doing this backwards in an attempt to get the same
   // tiebreak behaviour as before.
@@ -649,7 +522,7 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void
       }	
     }
     // Report
-    rep->report(adb, soap, adbQueryResponse, report_rot);
+    rep->report(adb, report_rot);
     // Exit
     delete[] point_queues;
     return;
@@ -660,79 +533,29 @@ void trackSequenceQueryRadNNReporter::report(adb_t *adb, struct soap *soap, void
   std::vector<Radresult>::reverse_iterator rit;
   std::priority_queue< NNresult, std::vector< NNresult>, std::greater<NNresult> > point_queue;
 
-  if(adbQueryResponse==0) {
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      if(adb)
-	std::cout << audiodb_index_key(adb, r.trackID) << " ";
-      else
-	std::cout << r.trackID << " ";
-      std::cout << r.count << std::endl;
+  for(rit = v.rbegin(); rit < v.rend(); rit++) {
+    r = *rit;
+    if(adb)
+      std::cout << audiodb_index_key(adb, r.trackID) << " ";
+    else
+      std::cout << r.trackID << " ";
+    std::cout << r.count << std::endl;
 
-      // Reverse the order of the points stored in point_queues
-      unsigned int qsize=point_queues[r.trackID].size();
-      for(unsigned int k=0; k < qsize; k++){
-	point_queue.push(point_queues[r.trackID].top());
-	point_queues[r.trackID].pop();
-      }
-      for(unsigned int k=0; k < qsize; k++){
-	rk = point_queue.top();
-	std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
-        if(report_rot) 
-          std::cout << " " << rk.rot;
-        std::cout << std::endl;
-	point_queue.pop();
-      }
+    // Reverse the order of the points stored in point_queues
+    unsigned int qsize=point_queues[r.trackID].size();
+    for(unsigned int k=0; k < qsize; k++){
+      point_queue.push(point_queues[r.trackID].top());
+      point_queues[r.trackID].pop();
     }
-  } else {
-    adb__queryResponse *response = (adb__queryResponse *) adbQueryResponse;
-    response->result.__sizeRlist=size*pointNN;
-    response->result.__sizeDist=size*pointNN;
-    response->result.__sizeQpos=size*pointNN;
-    response->result.__sizeSpos=size*pointNN;
-    response->result.Rlist= (char **) soap_malloc(soap, size * pointNN * sizeof(char *));
-    response->result.Dist = (double *) soap_malloc(soap, size * pointNN * sizeof(double));
-    response->result.Qpos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
-    response->result.Spos = (unsigned int *) soap_malloc(soap, size * pointNN * sizeof(unsigned int));
-    unsigned int k = 0;
-    // Loop over returned tracks
-    for(rit = v.rbegin(); rit < v.rend(); rit++) {
-      r = *rit;
-      // Reverse the order of the points stored in point_queues
-      unsigned int qsize=point_queues[r.trackID].size();
-      while(qsize--){
-	point_queue.push(point_queues[r.trackID].top());
-	point_queues[r.trackID].pop();
-      }
-      qsize=point_queue.size();
-      unsigned int numReports = pointNN;
-      while(numReports--){ // pop the rest of the points
-	if(qsize)
-	  rk = point_queue.top(); // Take one point from the top of the queue
-	else{
-	  rk.dist = 1000000000.0;
-	  rk.qpos = 0xFFFFFFFF;
-	  rk.spos = 0xFFFFFFFF;
-	}
-	  
-	response->result.Rlist[k] = (char *) soap_malloc(soap, O2_MAXFILESTR);
-	response->result.Dist[k] = rk.dist;
-	response->result.Qpos[k] = rk.qpos;
-	response->result.Spos[k] = rk.spos;
-	if(qsize){
-	  if(adb)
-	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%s", audiodb_index_key(adb, r.trackID));
-	  else
-	    snprintf(response->result.Rlist[k], O2_MAXFILESTR, "%d", r.trackID);	
-	  point_queue.pop();
-	  qsize--;
-	}
-	else
-	  snprintf(response->result.Rlist[k], O2_MAXFILESTR, "NULL");
-	k++;
-      }
+    for(unsigned int k=0; k < qsize; k++){
+      rk = point_queue.top();
+      std::cout << rk.dist << " " << rk.qpos << " " << rk.spos;
+      if(report_rot) 
+        std::cout << " " << rk.rot;
+      std::cout << std::endl;
+      point_queue.pop();
     }
- }
+  }
   delete[] point_queues;
 }
 
@@ -746,7 +569,7 @@ public:
   trackSequenceQueryRadNNReporterOneToOne(unsigned int pointNN, unsigned int trackNN, unsigned int numFiles);
   ~trackSequenceQueryRadNNReporterOneToOne();
   void add_point(unsigned int trackID, unsigned int qpos, unsigned int spos, double dist, int rot = 0);
-  void report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot);
+  void report(adb_t *adb, bool report_rot);
  protected:
   unsigned int pointNN;
   unsigned int trackNN;
@@ -794,25 +617,21 @@ void trackSequenceQueryRadNNReporterOneToOne::add_point(unsigned int trackID, un
 
 }
 
-void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, struct soap *soap, void *adbQueryResponse, bool report_rot) {
-  if(adbQueryResponse==0) {
-    std::vector< NNresult >::iterator vit;
-    NNresult rk;
-    for( vit = point_queue->begin() ; vit < point_queue->end() ; vit++ ){
-      rk = *vit;
-      std::cout << rk.dist << " " 
-		<< rk.qpos << " " 
-		<< rk.spos << " ";
-      if (report_rot)
-        std::cout << rk.rot << " ";
-      if(adb)
-	std::cout << audiodb_index_key(adb, rk.trackID) << " ";
-      else
-	std::cout << rk.trackID << " "; 
-      std::cout << std::endl;
-      }
-  } else {
-    // FIXME
+void trackSequenceQueryRadNNReporterOneToOne::report(adb_t *adb, bool report_rot) {
+  std::vector< NNresult >::iterator vit;
+  NNresult rk;
+  for( vit = point_queue->begin() ; vit < point_queue->end() ; vit++ ){
+    rk = *vit;
+    std::cout << rk.dist << " " 
+              << rk.qpos << " " 
+              << rk.spos << " ";
+    if (report_rot)
+      std::cout << rk.rot << " ";
+    if(adb)
+      std::cout << audiodb_index_key(adb, rk.trackID) << " ";
+    else
+      std::cout << rk.trackID << " "; 
+    std::cout << std::endl;
   }
 }
 

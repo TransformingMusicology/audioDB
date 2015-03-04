@@ -71,46 +71,6 @@ echo key1 1 > test-expected-output
 echo key2 1 >> test-expected-output
 cmp testoutput test-expected-output
 
-# WS
-WSPORT=10020
-${AUDIODB} -s ${WSPORT} --adb_root ${DBDIR} --adb_feature_root ${FDIR} &
-# HACK: deal with race on process creation
-sleep 1
-trap 'kill $!; exit 1' ERR
-
-# LARGE_ADB WS query from key
-${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -k key1 -R 1 --absolute-threshold -4.5 -n 1 --lsh_exact > testoutput
-echo key2 0 0 0 > test-expected-output
-cmp testoutput test-expected-output
-
-# LARGE_ADB WS query from feature file and power file tests
-${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -R 1 --absolute-threshold -4.5 -n 1 > testoutput
-echo key1 1 > test-expected-output
-echo key2 1 >> test-expected-output
-cmp testoutput test-expected-output
-
-stop_server $!
-
-# TEST LARGE_ADB WS WITH PRELOADED INDEX
-WSPORT=10020
-${AUDIODB} -s ${WSPORT} --load_index -d testdb -R 1 -l 1 --adb_root ${DBDIR} --adb_feature_root ${FDIR} &
-# HACK: deal with race on process creation
-sleep 1
-trap 'kill $!; exit 1' ERR
-
-# LARGE_ADB WS query from key
-${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -k key1 -R 1 --absolute-threshold -4.5 -n 1 --lsh_exact > testoutput
-echo key2 0 0 0 > test-expected-output
-cmp testoutput test-expected-output
-
-# LARGE_ADB WS query from feature file and power file tests
-${AUDIODB} -c localhost:${WSPORT} -d testdb -Q sequence -l 1 -f testquery -w testpower -R 1 --absolute-threshold -4.5 -n 1 > testoutput
-echo key1 1 > test-expected-output
-echo key2 1 >> test-expected-output
-cmp testoutput test-expected-output
-
-stop_server $!
-
 # Clean up
 . clean.sh
 

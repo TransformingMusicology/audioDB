@@ -82,12 +82,6 @@ section "Normalization control parameters" sectiondesc="These parameters control
 option "no_unit_norming" - "do not unit norm features when querying an L2Norm databases." flag off
 option "distance_kullback" - "use symmetric kullback divergence for distance function" flag off
 
-section "Web Services" sectiondesc="These commands enable the database process to establish a connection via the internet and operate as separate client and server processes.\n"
-
-option "SERVER" s "run as standalone web service on named port." int typestr="port" default="14475" optional
-option "load_index" - "make web service with memory-resident hashtables" flag off dependon="radius"
-option "client" c "run as a client using named host service." string typestr="hostname:port" optional
-
 
 text "
 Copyright (c) 2007-2008 Michael Casey, Christophe Rhodes
