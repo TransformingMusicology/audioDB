@@ -1,6 +1,6 @@
 #! /bin/bash
 
-AUDIODB=../../${EXECUTABLE:-audioDB}
+AUDIODB=../../build/${EXECUTABLE:-audioDB}
 export AUDIODB
 
 if [ -x ${AUDIODB#../} ]; then 

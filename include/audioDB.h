@@ -24,12 +24,12 @@
 
 // includes for LSH indexing
 extern "C" {
-#include "audioDB_API.h"
+#include "audioDB/audioDB_API.h"
 }
-#include "audioDB-internals.h"
+#include "audioDB/audioDB-internals.h"
 #include "ReporterBase.h"
-#include "accumulator.h"
-#include "lshlib.h"
+#include "audioDB/accumulator.h"
+#include "audioDB/lshlib.h"
 
 // includes for web services
 #include "cmdline.h"
