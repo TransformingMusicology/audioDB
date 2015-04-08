@@ -5,12 +5,12 @@ purpose "A feature vector database management system for content-based retrieval
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional
 text "\nDatabase commands are UPPER CASE. Command options are lower case.\n" 
 text ""
-section "Database Operations" sectiondesc="All database operations require a database argument."
+section "Database Operations" sectiondesc="All database operations require a database argument.\n"
 
 option "database" d "database file required by Database commands." string typestr="filename" optional
 option "adb_root" - "path prefix for database" string typestr="path" optional
 
-section "Database Creation" sectiondesc="Creating a new database file."
+section "Database Creation" sectiondesc="Creating a new database file.\n"
 
 option "NEW"    N "make a new (initially empty) database." dependon="database" optional
 option "size"   - "size of database file (in MB)" int dependon="NEW" optional hidden
@@ -18,7 +18,7 @@ option "datasize" - "size of data table requested (in MB)" int dependon="NEW" de
 option "ntracks" - "capacity of database for tracks" int dependon="NEW" default="20000" optional
 option "datadim" - "dimensionality of stored data" int dependon="NEW" default="9" optional
 
-section "Database Maintenance" sectiondesc="Tweaking and dumping databases."
+section "Database Maintenance" sectiondesc="Tweaking and dumping databases.\n"
 
 option "DUMP"   D "output all entries: index key size." dependon="database" optional
 option "output" - "output directory" string dependon="DUMP" default="audioDB.dump" optional
@@ -28,7 +28,7 @@ option "LISZT"  Z "LIst keyS and siZes of Tracks" dependon="database" optional
 option "lisztOffset" - "LISZT track offset (0-based index)" int typestr="number" default="0" dependon="LISZT" optional
 option "lisztLength" - "number of LISZT items to return" int typestr="number" default="32" dependon="LISZT" optional
 
-section "Database Information" sectiondesc="Information about databases."
+section "Database Information" sectiondesc="Information about databases.\n"
 
 option "STATUS" S "output database information to stdout." dependon="database" optional
 option "SAMPLE" - "sample statistics for database." dependon="database" optional
