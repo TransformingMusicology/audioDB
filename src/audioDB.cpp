@@ -888,14 +888,17 @@ void audioDB::query(const char* dbName, const char* inFile) {
   if(use_rotate) {
     int rotate_min = 0;
     int rotate_max = 0;
+    adb_status_t s = {0};
+    audiodb_status(adb, &s);
     if(rotate == -1) {
-      adb_status_t s = {0};
-      audiodb_status(adb, &s);
       rotate_min = 0;
       rotate_max = s.dim - 1;
     } else {
       rotate_min = -rotate;
       rotate_max = rotate;
+    }
+    if(qspec.params.ntracks > 0) {
+      qspec.params.ntracks = s.numFiles;
     }
     adb_query_results_t *ors = NULL;
     if(query_from_key) {
