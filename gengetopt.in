@@ -3,6 +3,8 @@ version "version 0.8.preview ($Revision$)"
 purpose "A feature vector database management system for content-based retrieval."
 
 option "verbosity" v "level of detail of operational information." int typestr="detail" default="1" optional
+option "lib-version" - "print shared library version" optional
+
 text "\nDatabase commands are UPPER CASE. Command options are lower case.\n" 
 text ""
 section "Database Operations" sectiondesc="All database operations require a database argument.\n"

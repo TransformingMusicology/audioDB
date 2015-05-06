@@ -121,6 +121,11 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
     exit(0);
   }
 
+  if (args_info.lib_version_given) {
+      printf("libaudioDB %s (%s)\n", __lib_build_number(), __lib_build_date());
+      exit(0);
+  }
+
   if(args_info.help_given){
     cmdline_parser_print_help();
     exit(0);
