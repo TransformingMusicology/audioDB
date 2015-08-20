@@ -20,7 +20,8 @@ OBJS=$(patsubst %,$(BUILD_DIR)/%,$(_OBJS))
 
 EXECUTABLE=audioDB
 
-BUILD_NUMBER=$(shell git rev-parse HEAD)
+BUILD_MODIFIED=$(shell git diff HEAD --no-ext-diff --quiet --exit-code ; if [ $$? -eq "1" ]; then echo "-modified"; fi)
+BUILD_ID=$(shell git rev-parse HEAD)$(BUILD_MODIFIED)
 BUILD_DATE=$(shell date +'%Y-%m-%dT%H:%M:%S')
 
 override CFLAGS+=-g -O3
@@ -55,7 +56,7 @@ $(BUILD_DIR)/HELP.txt: $(EXECUTABLE)
 	./$(BUILD_DIR)/$(EXECUTABLE) --help > $(BUILD_DIR)/HELP.txt
 
 $(SRC)/cmdline.c $(INCLUDE)/cmdline.h: gengetopt.in
-	$(GENGETOPT) --set-version="$(BUILD_NUMBER) ($(BUILD_DATE))" --header-output-dir=$(INCLUDE) --src-output-dir=$(SRC) -e <gengetopt.in
+	$(GENGETOPT) --set-version="$(BUILD_ID) ($(BUILD_DATE))" --header-output-dir=$(INCLUDE) --src-output-dir=$(SRC) -e <gengetopt.in
 
 $(OBJS): $(BUILD_DIR)/%.o: $(SRC)/%.cpp $(INCLUDE)/audioDB.h $(INCLUDE)/reporter.h $(INCLUDE)/ReporterBase.h #$(ADB_INCLUDE)/audioDB/audioDB_API.h $(BUILD_DIR)/cmdline.h  $(ADB_INCLUDE)/audioDB/lshlib.h
 	$(CXX) -o $@ -c $(CFLAGS) $(GSL_INCLUDE) $(ADB_INCLUDE) -I$(INCLUDE) -Wall $<

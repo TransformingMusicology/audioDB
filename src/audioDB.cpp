@@ -122,7 +122,7 @@ int audioDB::processArgs(const unsigned argc, const char *argv[]){
   }
 
   if (args_info.lib_version_given) {
-      printf("libaudioDB %s (%s)\n", audiodb_lib_build_number(), audiodb_lib_build_date());
+      printf("libaudioDB %s (%s)\n", audiodb_lib_build_id(), audiodb_lib_build_date());
       exit(0);
   }
 
